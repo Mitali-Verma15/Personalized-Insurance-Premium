@@ -20,23 +20,15 @@ st.set_page_config(
 # CUSTOM CSS
 # ==================================================
 
-
 st.markdown("""
 <style>
-
-
-
 .main > div {
     padding-top: 0.5rem;
 }
 
-
-
 .stApp {
     background-color: #f8fafc;
 }
-
-
 
 [data-testid="stMetric"] {
     background:white;
@@ -46,25 +38,22 @@ st.markdown("""
     box-shadow:0px 2px 8px rgba(0,0,0,0.08);
 }
 
-
-
 .block-container {
     padding-top:1rem;
     padding-bottom:1rem;
 }
-
-
-
 </style>
 """, unsafe_allow_html=True)
-
-
 
 # ==================================================
 # LOAD DATA
 # ==================================================
 
-df = pd.read_csv("insurance_synthetic.csv")
+@st.cache_data
+def load_data():
+    return pd.read_csv("insurance_synthetic.csv")
+
+df = load_data()
 
 # ==================================================
 # HEADER
@@ -72,13 +61,11 @@ df = pd.read_csv("insurance_synthetic.csv")
 
 st.title("🏥 Personalized Insurance Premium Advisor")
 
-
 # ==================================================
 # SESSION STATE
 # ==================================================
 
 if "result" not in st.session_state:
-
     st.session_state.result = calculate_premium(
         30,
         "Male",
@@ -93,39 +80,28 @@ if "result" not in st.session_state:
 # TABS
 # ==================================================
 
-tab1, tab2, tab3= st.tabs([
+tab1, tab2, tab3 = st.tabs([
     "📊 Dashboard",
     "🧮 Premium Calculator",
-    "🚦 Risk Assessment",
+    "🚦 Risk Assessment"
 ])
 
 # ==================================================
-# TAB 1
-# DASHBOARD
+# TAB 1 : DASHBOARD
 # ==================================================
+
 with tab1:
 
-
-
     c1, c2, c3, c4 = st.columns(4)
-
-
 
     c1.metric("Customers", f"{len(df):,}")
     c2.metric("Revenue", f"₹{int(df['premium'].sum()):,}")
     c3.metric("Avg Premium", f"₹{int(df['premium'].mean()):,}")
     c4.metric("Avg BMI", round(df["bmi"].mean(), 1))
 
-
-
-
     row1_left, row1_right = st.columns([2, 1])
 
-
-
     with row1_left:
-
-
 
         fig1 = px.histogram(
             df,
@@ -134,30 +110,20 @@ with tab1:
             title="Premium Distribution"
         )
 
-
-
         fig1.update_layout(height=320)
-
-
 
         st.plotly_chart(
             fig1,
             use_container_width=True
         )
 
-
-
     with row1_right:
-
-
 
         smoker_premium = (
             df.groupby("smoker")["premium"]
             .mean()
             .reset_index()
         )
-
-
 
         fig2 = px.bar(
             smoker_premium,
@@ -167,34 +133,22 @@ with tab1:
             title="Smoking Impact"
         )
 
-
-
         fig2.update_layout(height=320)
-
-
 
         st.plotly_chart(
             fig2,
             use_container_width=True
         )
 
-
-
     row2_left, row2_right = st.columns(2)
 
-
-
     with row2_left:
-
-
 
         disease_df = (
             df.groupby("existing_disease")["premium"]
             .mean()
             .reset_index()
         )
-
-
 
         fig3 = px.bar(
             disease_df,
@@ -204,30 +158,20 @@ with tab1:
             title="Disease Impact"
         )
 
-
-
         fig3.update_layout(height=320)
-
-
 
         st.plotly_chart(
             fig3,
             use_container_width=True
         )
 
-
-
     with row2_right:
-
-
 
         age_df = (
             df.groupby("age")["premium"]
             .mean()
             .reset_index()
         )
-
-
 
         fig4 = px.line(
             age_df,
@@ -237,20 +181,15 @@ with tab1:
             title="Premium vs Age"
         )
 
-
-
         fig4.update_layout(height=320)
-
-
 
         st.plotly_chart(
             fig4,
             use_container_width=True
         )
 
+
     with st.expander("Customer Dataset Preview"):
-
-
 
         st.dataframe(
             df.head(20),
@@ -259,8 +198,7 @@ with tab1:
         )
 
 # ==================================================
-# TAB 2
-# PREMIUM CALCULATOR
+# TAB 2 : PREMIUM CALCULATOR
 # ==================================================
 
 with tab2:
@@ -271,12 +209,7 @@ with tab2:
 
     with col1:
 
-        age = st.slider(
-            "Age",
-            18,
-            80,
-            30
-        )
+        age = st.slider("Age", 18, 80, 30)
 
         bmi = st.slider(
             "BMI",
@@ -311,12 +244,7 @@ with tab2:
 
         region = st.selectbox(
             "Region",
-            [
-                "North",
-                "South",
-                "East",
-                "West"
-            ]
+            ["North", "South", "East", "West"]
         )
 
     if st.button(
@@ -340,7 +268,32 @@ with tab2:
         f"Predicted Premium: ₹{result['premium']:,}"
     )
 
-    # Risk-factor based premium breakdown
+
+    report_df = pd.DataFrame({
+        "Metric": [
+            "Predicted Premium",
+            "Risk Score",
+            "Risk Category",
+            "Recommended Plan",
+            "Optimized Premium",
+            "Potential Savings"
+        ],
+        "Value": [
+            result["premium"],
+            result["risk_score"],
+            result["risk_category"],
+            result["recommended_plan"],
+            result["optimized_premium"],
+            result["savings"]
+        ]
+    })
+
+    st.download_button(
+        label="📥 Download Prediction Report",
+        data=report_df.to_csv(index=False),
+        file_name="insurance_prediction_report.csv",
+        mime="text/csv"
+    )
 
     age_factor = min(age / 80, 1)
     bmi_factor = min(abs(bmi - 22) / 20, 1)
@@ -348,25 +301,25 @@ with tab2:
     disease_factor = 1 if existing_disease == "Yes" else 0.2
 
     total_factor = (
-    age_factor +
-    bmi_factor +
-    smoker_factor +
-    disease_factor
+        age_factor +
+        bmi_factor +
+        smoker_factor +
+        disease_factor
     )
 
     breakdown = pd.DataFrame({
-    "Component": [
-        "Age Impact",
-        "BMI Impact",
-        "Smoking Impact",
-        "Disease Impact"
-    ],
-    "Value": [
-        result["premium"] * age_factor / total_factor,
-        result["premium"] * bmi_factor / total_factor,
-        result["premium"] * smoker_factor / total_factor,
-        result["premium"] * disease_factor / total_factor
-    ]
+        "Component": [
+            "Age Impact",
+            "BMI Impact",
+            "Smoking Impact",
+            "Disease Impact"
+        ],
+        "Value": [
+            result["premium"] * age_factor / total_factor,
+            result["premium"] * bmi_factor / total_factor,
+            result["premium"] * smoker_factor / total_factor,
+            result["premium"] * disease_factor / total_factor
+        ]
     })
 
     pie = px.pie(
@@ -383,8 +336,7 @@ with tab2:
     )
 
 # ==================================================
-# TAB 3
-# RISK ASSESSMENT
+# TAB 3 : RISK ASSESSMENT
 # ==================================================
 
 with tab3:
@@ -399,32 +351,20 @@ with tab3:
             go.Indicator(
                 mode="gauge+number",
                 value=result["risk_score"],
-                title={
-                    "text": "Health Risk Score"
-                },
+                title={"text": "Health Risk Score"},
                 gauge={
-                    "axis": {
-                        "range": [0, 100]
-                    },
+                    "axis": {"range": [0, 100]},
                     "steps": [
-                        {
-                            "range": [0, 40],
-                            "color": "green"
-                        },
-                        {
-                            "range": [40, 70],
-                            "color": "orange"
-                        },
-                        {
-                            "range": [70, 100],
-                            "color": "red"
-                        }
+                        {"range": [0, 40], "color": "green"},
+                        {"range": [40, 70], "color": "orange"},
+                        {"range": [70, 100], "color": "red"}
                     ]
                 }
             )
         )
 
         gauge.update_layout(height=320)
+
         st.plotly_chart(
             gauge,
             use_container_width=True
@@ -443,7 +383,6 @@ with tab3:
                     100 if existing_disease == "Yes" else 20,
                     children * 15
                 ],
-
                 theta=[
                     "Age",
                     "BMI",
@@ -451,7 +390,6 @@ with tab3:
                     "Disease",
                     "Dependents"
                 ],
-
                 fill="toself"
             )
         )
@@ -472,9 +410,20 @@ with tab3:
             use_container_width=True
         )
 
-    st.error(
-        f"Risk Category: {result['risk_category']}"
-    )
+    if result["risk_category"] == "Low Risk":
+        st.success(
+            f"Risk Category: {result['risk_category']}"
+        )
+
+    elif result["risk_category"] == "Medium Risk":
+        st.warning(
+            f"Risk Category: {result['risk_category']}"
+        )
+
+    else:
+        st.error(
+            f"Risk Category: {result['risk_category']}"
+        )
 
     st.subheader("🤖 Health Recommendations")
 
